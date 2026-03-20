@@ -281,6 +281,7 @@ section{position:relative;z-index:10}
   box-shadow:0 8px 32px rgba(0,0,0,0.3);
 }
 .input-row{display:flex;gap:12px;margin-bottom:1.5rem;flex-wrap:wrap}
+.input-label{font-size:0.78rem;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,215,0,0.55);font-weight:700;margin-bottom:6px;font-family:'Nunito',sans-serif}
 .eid-input{
   flex:1;min-width:200px;padding:14px 20px;border-radius:12px;
   border:1px solid var(--glass-border);background:rgba(255,255,255,0.05);
@@ -572,10 +573,16 @@ footer{
 <section id="greeting">
   <div class="section-title">🌟 Your Personal Eid Wish</div>
   <div class="section-divider"></div>
-  <p class="section-sub">Enter your name and receive a personalized blessing</p>
+  <p class="section-sub">Personalise your greeting and send it to someone special 💌</p>
   <div class="glass-card">
+    <div class="input-label">📩 Send To</div>
+    <div class="input-row" style="margin-bottom:10px">
+      <input class="eid-input" id="recipient-input" type="text" placeholder="Recipient's name… (e.g. Ahmed, Fatima)" maxlength="40"
+        onkeydown="if(event.key==='Enter')document.getElementById('name-input').focus()">
+    </div>
+    <div class="input-label">✍️ From (Your Name)</div>
     <div class="input-row">
-      <input class="eid-input" id="name-input" type="text" placeholder="Enter your name..." maxlength="40" onkeydown="if(event.key==='Enter')generateWish()">
+      <input class="eid-input" id="name-input" type="text" placeholder="Your name…" maxlength="40" onkeydown="if(event.key==='Enter')generateWish()">
       <button class="btn-primary" onclick="generateWish()">✨ Generate Wish</button>
     </div>
     <div id="wish-display"></div>
@@ -894,22 +901,24 @@ function toggleMode(){
 
 // ============ GREETING GENERATOR ============
 const wishTemplates=[
-  n=>`Eid Mubarak, ${n}! 🌙\nMay Allah bless you with success, joy, and endless happiness this Eid and always. تقبل الله منا ومنكم 💫`,
-  n=>`Ya ${n}, Eid Mubarak! ✨\nMay this blessed day fill your heart with faith, your home with warmth, and your life with peace. Kullu 'aam wa anta bikhair! 🌸`,
-  n=>`Eid Mubarak, dear ${n}! 🎊\nMay Allah accept your prayers and fasts, forgive your sins, and shower you with His infinite mercy and blessings. آمين 🤲`,
-  n=>`Happy Eid, ${n}! 🌙✨\nMay this Eid bring you closer to your loved ones, fill your days with laughter, and your heart with gratitude. Eid Sa'eed! 🎉`,
-  n=>`${n}, Taqabbalallahu Minna wa Minkum! 🌸\nMay Allah's blessings shine upon you and your family on this joyous Eid al-Fitr. Wishing you a blessed and happy Eid! 💛`
+  (to,from)=>`Eid Mubarak, ${to}! 🌙\nMay Allah bless you with success, joy, and endless happiness this Eid and always. تقبل الله منا ومنكم 💫\n\n— With love, ${from}`,
+  (to,from)=>`Ya ${to}, Eid Mubarak! ✨\nMay this blessed day fill your heart with faith, your home with warmth, and your life with peace. Kullu 'aam wa anta bikhair! 🌸\n\n— ${from}`,
+  (to,from)=>`Eid Mubarak, dear ${to}! 🎊\nMay Allah accept your prayers and fasts, forgive your sins, and shower you with His infinite mercy and blessings. آمين 🤲\n\n— ${from} sends you love ❤️`,
+  (to,from)=>`Happy Eid, ${to}! 🌙✨\nMay this Eid bring you closer to your loved ones, fill your days with laughter, and your heart with gratitude. Eid Sa'eed! 🎉\n\n— ${from}`,
+  (to,from)=>`${to}, Taqabbalallahu Minna wa Minkum! 🌸\nMay Allah's blessings shine upon you and your family on this joyous Eid al-Fitr. Wishing you a blessed and happy Eid! 💛\n\n— From ${from} with duas 🤲`
 ];
 let currentWishIdx=0;
 function generateWish(){
-  const name=document.getElementById('name-input').value.trim()||'Friend';
+  const recipient=document.getElementById('recipient-input').value.trim()||'Friend';
+  const sender=document.getElementById('name-input').value.trim()||'Someone Special';
   currentWishIdx=Math.floor(Math.random()*wishTemplates.length);
-  typeWish(wishTemplates[currentWishIdx](name));
+  typeWish(wishTemplates[currentWishIdx](recipient,sender));
 }
 function randomWish(){
-  const name=document.getElementById('name-input').value.trim()||'Friend';
+  const recipient=document.getElementById('recipient-input').value.trim()||'Friend';
+  const sender=document.getElementById('name-input').value.trim()||'Someone Special';
   currentWishIdx=(currentWishIdx+1)%wishTemplates.length;
-  typeWish(wishTemplates[currentWishIdx](name));
+  typeWish(wishTemplates[currentWishIdx](recipient,sender));
 }
 function typeWish(text){
   const el=document.getElementById('wish-display');
@@ -921,39 +930,251 @@ function typeWish(text){
     if(i>=text.length){clearInterval(interval);actions.style.display='flex';}
   },25);
 }
+// ── Shared canvas drawing helpers ──────────────────────────────────────────
+function wrapText(ctx,text,x,y,maxWidth,lineHeight){
+  const words=text.split(' ');let line='';const drawn=[];
+  for(let n=0;n<words.length;n++){
+    const test=line+words[n]+' ';
+    if(ctx.measureText(test).width>maxWidth&&n>0){drawn.push({t:line.trim(),y});line=words[n]+' ';y+=lineHeight;}
+    else line=test;
+  }
+  drawn.push({t:line.trim(),y});
+  drawn.forEach(l=>ctx.fillText(l.t,x,l.y));
+  return y+lineHeight;
+}
+
+function drawStarfield(ctx,W,H,count){
+  for(let i=0;i<count;i++){
+    const x=Math.random()*W,y=Math.random()*H;
+    const r=Math.random()*1.8+0.2;
+    const a=Math.random()*0.9+0.1;
+    ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);
+    ctx.fillStyle=`rgba(255,255,220,${a})`;ctx.fill();
+    // occasional sparkle cross
+    if(Math.random()<0.08){
+      ctx.strokeStyle=`rgba(255,240,180,${a*0.6})`;ctx.lineWidth=0.5;
+      ctx.beginPath();ctx.moveTo(x-r*3,y);ctx.lineTo(x+r*3,y);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(x,y-r*3);ctx.lineTo(x,y+r*3);ctx.stroke();
+    }
+  }
+}
+
+function drawMoon(ctx,cx,cy,R){
+  // outer glow layers
+  [[R*3.5,'rgba(255,215,0,0.05)'],[R*2.5,'rgba(255,215,0,0.1)'],[R*1.6,'rgba(255,215,0,0.18)']].forEach(([r,c])=>{
+    const g=ctx.createRadialGradient(cx,cy,0,cx,cy,r);
+    g.addColorStop(0,c);g.addColorStop(1,'transparent');
+    ctx.fillStyle=g;ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.fill();
+  });
+  // moon body
+  const mg=ctx.createRadialGradient(cx-R*0.25,cy-R*0.25,R*0.05,cx,cy,R);
+  mg.addColorStop(0,'#fffde7');mg.addColorStop(0.3,'#FFE566');mg.addColorStop(0.65,'#FFD700');mg.addColorStop(1,'#FF8C00');
+  ctx.fillStyle=mg;ctx.beginPath();ctx.arc(cx,cy,R,0,Math.PI*2);ctx.fill();
+  // subtle craters
+  ctx.fillStyle='rgba(200,120,0,0.18)';
+  [[cx+R*0.2,cy-R*0.1,R*0.12],[cx-R*0.25,cy+R*0.3,R*0.08],[cx+R*0.05,cy+R*0.4,R*0.06]].forEach(([x,y,r])=>{ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();});
+  // highlight
+  const hl=ctx.createRadialGradient(cx-R*0.3,cy-R*0.35,0,cx-R*0.3,cy-R*0.35,R*0.55);
+  hl.addColorStop(0,'rgba(255,255,240,0.45)');hl.addColorStop(1,'transparent');
+  ctx.fillStyle=hl;ctx.beginPath();ctx.arc(cx,cy,R,0,Math.PI*2);ctx.fill();
+  // ring
+  ctx.strokeStyle='rgba(255,215,0,0.25)';ctx.lineWidth=2;
+  ctx.beginPath();ctx.arc(cx,cy,R+18,0,Math.PI*2);ctx.stroke();
+  ctx.strokeStyle='rgba(255,215,0,0.12)';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.arc(cx,cy,R+36,0,Math.PI*2);ctx.stroke();
+}
+
+function drawIslamicStar(ctx,cx,cy,R,color,alpha){
+  ctx.save();ctx.globalAlpha=alpha;ctx.strokeStyle=color;ctx.lineWidth=1.2;
+  ctx.beginPath();
+  for(let i=0;i<8;i++){
+    const a1=i*Math.PI/4-Math.PI/2;const a2=a1+Math.PI/8;
+    ctx.lineTo(cx+Math.cos(a1)*R,cy+Math.sin(a1)*R);
+    ctx.lineTo(cx+Math.cos(a2)*R*0.42,cy+Math.sin(a2)*R*0.42);
+  }
+  ctx.closePath();ctx.stroke();ctx.restore();
+}
+
+function drawOrnamentalBorder(ctx,W,H,margin){
+  const m=margin;
+  // outer double border
+  ctx.strokeStyle='rgba(255,215,0,0.55)';ctx.lineWidth=6;
+  ctx.strokeRect(m,m,W-m*2,H-m*2);
+  ctx.strokeStyle='rgba(255,215,0,0.2)';ctx.lineWidth=2;
+  ctx.strokeRect(m+14,m+14,W-m*2-28,H-m*2-28);
+  // corner ornaments
+  const corners=[[m,m],[W-m,m],[W-m,H-m],[m,H-m]];
+  const rots=[0,Math.PI/2,Math.PI,3*Math.PI/2];
+  corners.forEach(([cx,cy],idx)=>{
+    ctx.save();ctx.translate(cx,cy);ctx.rotate(rots[idx]);
+    ctx.strokeStyle='rgba(255,215,0,0.6)';ctx.lineWidth=2;
+    // L-shape inner corner
+    ctx.beginPath();ctx.moveTo(30,0);ctx.lineTo(0,0);ctx.lineTo(0,30);ctx.stroke();
+    // diamond dot
+    ctx.fillStyle='rgba(255,215,0,0.7)';
+    ctx.save();ctx.rotate(Math.PI/4);ctx.fillRect(-5,-5,10,10);ctx.restore();
+    ctx.restore();
+  });
+  // mid-edge ornament diamonds
+  [[W/2,m],[W/2,H-m],[m,H/2],[W-m,H/2]].forEach(([cx,cy])=>{
+    ctx.save();ctx.translate(cx,cy);ctx.rotate(Math.PI/4);
+    ctx.fillStyle='rgba(255,215,0,0.45)';ctx.fillRect(-4,-4,8,8);ctx.restore();
+  });
+}
+
+function drawMosqueSilhouette(ctx,W,H){
+  const baseY=H-60;const midX=W/2;
+  ctx.fillStyle='rgba(255,215,0,0.07)';
+  // main dome
+  ctx.beginPath();ctx.arc(midX,baseY-80,120,Math.PI,0);ctx.rect(midX-120,baseY-80,240,80);ctx.fill();
+  // minaret left
+  ctx.beginPath();ctx.rect(midX-210,baseY-180,30,180);
+  ctx.arc(midX-195,baseY-180,15,Math.PI,0);ctx.fill();
+  ctx.beginPath();ctx.moveTo(midX-195,baseY-210);ctx.lineTo(midX-200,baseY-185);ctx.lineTo(midX-190,baseY-185);ctx.closePath();ctx.fill();
+  // minaret right
+  ctx.beginPath();ctx.rect(midX+180,baseY-180,30,180);
+  ctx.arc(midX+195,baseY-180,15,Math.PI,0);ctx.fill();
+  ctx.beginPath();ctx.moveTo(midX+195,baseY-210);ctx.lineTo(midX+200,baseY-185);ctx.lineTo(midX+190,baseY-185);ctx.closePath();ctx.fill();
+  // small side domes
+  ctx.beginPath();ctx.arc(midX-80,baseY-50,40,Math.PI,0);ctx.rect(midX-120,baseY-50,80,50);ctx.fill();
+  ctx.beginPath();ctx.arc(midX+80,baseY-50,40,Math.PI,0);ctx.rect(midX,baseY-50,80,50);ctx.fill();
+}
+
+function drawDecorativeStrip(ctx,W,y,color){
+  ctx.strokeStyle=color;ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(60,y);ctx.lineTo(W-60,y);ctx.stroke();
+  // dots along line
+  for(let x=100;x<W-80;x+=80){ctx.beginPath();ctx.arc(x,y,2.5,0,Math.PI*2);ctx.fillStyle=color;ctx.fill();}
+}
+
+function drawShootingStars(ctx,W,H){
+  const count=6;
+  for(let i=0;i<count;i++){
+    const x1=Math.random()*W*0.8;const y1=Math.random()*H*0.3;
+    const len=60+Math.random()*80;const angle=Math.PI/5+Math.random()*0.3;
+    const g=ctx.createLinearGradient(x1,y1,x1+Math.cos(angle)*len,y1+Math.sin(angle)*len);
+    g.addColorStop(0,'rgba(255,255,220,0)');g.addColorStop(0.4,'rgba(255,255,200,0.7)');g.addColorStop(1,'rgba(255,255,200,0)');
+    ctx.strokeStyle=g;ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x1+Math.cos(angle)*len,y1+Math.sin(angle)*len);ctx.stroke();
+  }
+}
+
+function buildEidCanvas(ctx,W,H,name,wishText,sender){
+  // ─── Background ──────────────────────────────────────
+  const bg=ctx.createLinearGradient(0,0,W,H);
+  bg.addColorStop(0,'#07071f');bg.addColorStop(0.35,'#0c1640');bg.addColorStop(0.65,'#160838');bg.addColorStop(1,'#07071a');
+  ctx.fillStyle=bg;ctx.fillRect(0,0,W,H);
+
+  // nebula-like soft glows in background
+  [[W*0.2,H*0.15,300,'rgba(30,20,100,0.4)'],[W*0.8,H*0.1,250,'rgba(20,40,120,0.35)'],[W*0.5,H*0.5,400,'rgba(60,10,80,0.25)']].forEach(([x,y,r,c])=>{
+    const g=ctx.createRadialGradient(x,y,0,x,y,r);g.addColorStop(0,c);g.addColorStop(1,'transparent');
+    ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
+  });
+
+  // ─── Starfield ───────────────────────────────────────
+  drawStarfield(ctx,W,H,220);
+  drawShootingStars(ctx,W,H);
+
+  // ─── Mosque silhouette at bottom ─────────────────────
+  drawMosqueSilhouette(ctx,W,H);
+
+  // ─── Islamic star ornaments (corners + scattered) ────
+  drawIslamicStar(ctx,120,160,55,'#FFD700',0.22);
+  drawIslamicStar(ctx,W-120,160,55,'#FFD700',0.22);
+  drawIslamicStar(ctx,80,H-200,40,'#FFD700',0.15);
+  drawIslamicStar(ctx,W-80,H-200,40,'#FFD700',0.15);
+  drawIslamicStar(ctx,W*0.18,H*0.45,30,'#FFA500',0.12);
+  drawIslamicStar(ctx,W*0.82,H*0.45,30,'#FFA500',0.12);
+
+  // ─── Ornamental border ───────────────────────────────
+  drawOrnamentalBorder(ctx,W,H,30);
+
+  // ─── Moon (upper centre) ─────────────────────────────
+  drawMoon(ctx,W/2,340,145);
+
+  // ─── Small crescent to the right of moon ─────────────
+  ctx.save();
+  const crescentX=W/2+130,crescentY=260,cr=36;
+  ctx.fillStyle='rgba(255,215,0,0.75)';
+  ctx.beginPath();ctx.arc(crescentX,crescentY,cr,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='rgba(15,18,65,1)';
+  ctx.beginPath();ctx.arc(crescentX+10,crescentY-6,cr*0.82,0,Math.PI*2);ctx.fill();
+  ctx.restore();
+
+  // ─── Decorative strip below moon ─────────────────────
+  drawDecorativeStrip(ctx,W,535,'rgba(255,215,0,0.3)');
+
+  // ─── "Eid Mubarak" heading ───────────────────────────
+  ctx.textAlign='center';
+  // shadow layer
+  ctx.fillStyle='rgba(255,100,0,0.35)';
+  ctx.font=`bold 108px 'Georgia', serif`;
+  ctx.fillText('Eid Mubarak',W/2+4,668);
+  // gold gradient text
+  const tg=ctx.createLinearGradient(0,580,0,680);
+  tg.addColorStop(0,'#FFE566');tg.addColorStop(0.5,'#FFD700');tg.addColorStop(1,'#FFA500');
+  ctx.fillStyle=tg;ctx.font=`bold 108px 'Georgia', serif`;
+  ctx.fillText('Eid Mubarak',W/2,664);
+
+  // ─── Arabic subtitle ─────────────────────────────────
+  ctx.fillStyle='rgba(255,230,150,0.9)';
+  ctx.font=`italic 52px 'Georgia', serif`;
+  ctx.fillText('تقبل الله منا ومنكم',W/2,742);
+
+  // ─── Emoji / star row ────────────────────────────────
+  ctx.font='52px serif';
+  ctx.fillText('🌙  ✨  🕌  ✨  🌙',W/2,820);
+
+  // ─── Thin divider ────────────────────────────────────
+  drawDecorativeStrip(ctx,W,858,'rgba(255,215,0,0.25)');
+
+  // ─── Personalised greeting ───────────────────────────
+  if(name&&name!=='Friend'){
+    ctx.fillStyle='rgba(255,240,160,0.85)';
+    ctx.font=`italic 46px 'Georgia', serif`;
+    ctx.fillText(`To: ${name} 🌸`,W/2,920);
+  }
+  if(sender){
+    ctx.fillStyle='rgba(255,220,120,0.65)';
+    ctx.font=`italic 38px 'Georgia', serif`;
+    ctx.fillText(`From: ${sender} ❤️`,W/2,name&&name!=='Friend'?976:930);
+  }
+
+  // ─── Wish text (with word-wrap) ──────────────────────
+  ctx.fillStyle='rgba(220,210,255,0.92)';
+  ctx.font=`38px 'Georgia', serif`;
+  const margin=110,maxW=W-margin*2,lh=64;
+  const rawLines=(wishText||'').split('\n').filter(l=>l.trim());
+  let ty=1020;
+  if(!name||name==='Friend') ty=960;
+  rawLines.forEach(line=>{
+    ty=wrapText(ctx,line,W/2,ty,maxW,lh)+8;
+  });
+
+  // ─── Bottom blessing ─────────────────────────────────
+  drawDecorativeStrip(ctx,W,H-190,'rgba(255,215,0,0.22)');
+  ctx.fillStyle='rgba(255,215,0,0.7)';
+  ctx.font=`italic 36px 'Georgia', serif`;
+  ctx.fillText('Taqabbalallahu Minna wa Minkum 🤲',W/2,H-145);
+  ctx.fillStyle='rgba(255,200,100,0.5)';
+  ctx.font=`30px serif`;
+  ctx.fillText('آمين  •  Ameen  •  آمين',W/2,H-95);
+
+  // ─── Author watermark ────────────────────────────────
+  ctx.fillStyle='rgba(255,215,0,0.35)';
+  ctx.font=`24px 'Georgia', serif`;
+  ctx.fillText('❤ Ishfaque',W/2,H-52);
+}
+
 function downloadWish(){
-  const name=document.getElementById('name-input').value.trim()||'Friend';
+  const recipient=document.getElementById('recipient-input').value.trim()||'Friend';
+  const sender=document.getElementById('name-input').value.trim()||'';
   const wish=document.getElementById('wish-display').textContent;
   const canvas=document.getElementById('wish-canvas');
   const ctx=canvas.getContext('2d');
-  // Gradient background
-  const grd=ctx.createLinearGradient(0,0,1080,1920);
-  grd.addColorStop(0,'#0a0a2e');grd.addColorStop(0.5,'#0d1b4b');grd.addColorStop(1,'#1a0a3e');
-  ctx.fillStyle=grd;ctx.fillRect(0,0,1080,1920);
-  // Stars
-  ctx.fillStyle='rgba(255,255,220,0.8)';
-  for(let i=0;i<150;i++){ctx.beginPath();ctx.arc(Math.random()*1080,Math.random()*1920,Math.random()*2,0,Math.PI*2);ctx.fill();}
-  // Moon
-  const mg=ctx.createRadialGradient(490,460,10,520,490,160);
-  mg.addColorStop(0,'#fffde7');mg.addColorStop(0.4,'#FFD700');mg.addColorStop(1,'#FF8C00');
-  ctx.fillStyle=mg;ctx.beginPath();ctx.arc(540,500,150,0,Math.PI*2);ctx.fill();
-  // Glow
-  const glw=ctx.createRadialGradient(540,500,0,540,500,300);
-  glw.addColorStop(0,'rgba(255,215,0,0.3)');glw.addColorStop(1,'transparent');
-  ctx.fillStyle=glw;ctx.beginPath();ctx.arc(540,500,300,0,Math.PI*2);ctx.fill();
-  // Eid Mubarak
-  ctx.fillStyle='#FFD700';ctx.font='bold 90px serif';ctx.textAlign='center';
-  ctx.fillText('Eid Mubarak',540,750);ctx.font='50px serif';ctx.fillText('🌙 ✨',540,830);
-  // Wish text
-  ctx.fillStyle='rgba(255,230,150,0.95)';ctx.font='44px serif';
-  const lines=wish.split('\n');
-  lines.forEach((line,i)=>ctx.fillText(line,540,980+i*70));
-  // Border
-  ctx.strokeStyle='rgba(255,215,0,0.4)';ctx.lineWidth=8;
-  ctx.strokeRect(30,30,1020,1860);
-  // Download
+  buildEidCanvas(ctx,1080,1920,recipient,wish,sender);
   const link=document.createElement('a');
-  link.download=`Eid-Mubarak-${name}.png`;link.href=canvas.toDataURL();link.click();
+  link.download=`Eid-Mubarak-${recipient}.png`;link.href=canvas.toDataURL('image/png');link.click();
 }
 
 // ============ BLESSINGS ============
@@ -1037,23 +1258,8 @@ function shareFb(){window.open(`https://www.facebook.com/sharer/sharer.php?quote
 function downloadCard(){
   const canvas=document.getElementById('wish-canvas');
   const ctx=canvas.getContext('2d');
-  const grd=ctx.createLinearGradient(0,0,1080,1920);
-  grd.addColorStop(0,'#0a0a2e');grd.addColorStop(0.5,'#0d1b4b');grd.addColorStop(1,'#1a0a3e');
-  ctx.fillStyle=grd;ctx.fillRect(0,0,1080,1920);
-  ctx.fillStyle='rgba(255,255,220,0.8)';
-  for(let i=0;i<200;i++){ctx.beginPath();ctx.arc(Math.random()*1080,Math.random()*1920,Math.random()*2,0,Math.PI*2);ctx.fill();}
-  const mg=ctx.createRadialGradient(490,460,10,520,490,160);
-  mg.addColorStop(0,'#fffde7');mg.addColorStop(0.4,'#FFD700');mg.addColorStop(1,'#FF8C00');
-  ctx.fillStyle=mg;ctx.beginPath();ctx.arc(540,500,150,0,Math.PI*2);ctx.fill();
-  ctx.fillStyle='#FFD700';ctx.font='bold 100px serif';ctx.textAlign='center';
-  ctx.fillText('Eid Mubarak',540,780);
-  ctx.font='60px serif';ctx.fillText('🌙 ✨ 🌙',540,880);
-  ctx.fillStyle='rgba(255,230,150,0.9)';ctx.font='italic 50px serif';
-  ctx.fillText('تقبل الله منا ومنكم',540,1000);
-  ctx.fillStyle='rgba(240,220,255,0.7)';ctx.font='40px serif';
-  ctx.fillText('Kullu \'aam wa antum bikhair',540,1100);
-  ctx.strokeStyle='rgba(255,215,0,0.5)';ctx.lineWidth=10;ctx.strokeRect(30,30,1020,1860);
-  const link=document.createElement('a');link.download='Eid-Mubarak-Card.png';link.href=canvas.toDataURL();link.click();
+  buildEidCanvas(ctx,1080,1920,'','');
+  const link=document.createElement('a');link.download='Eid-Mubarak-Card.png';link.href=canvas.toDataURL('image/png');link.click();
 }
 
 // ============ INTERACTIVE STARS (click to twinkle) ============
